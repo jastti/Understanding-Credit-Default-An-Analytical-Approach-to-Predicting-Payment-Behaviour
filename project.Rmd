@@ -1,0 +1,349 @@
+---
+title: "303 Project Proposal"
+author: "Jasmine Tian"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#install.packages("car")
+#install.packages("rms")
+#install.packages("gt")
+#install.packages("kableExtra")
+
+library(gt)
+library(rms)
+library(car)
+library(readr)
+library(kableExtra)
+```
+
+```{r}
+data <- read.csv("default of credit card clients.csv")
+
+# Clean the original data since he original data only defined 4 levels of education, 
+# so clean out the other values
+data <- data[data$X3 %in% c(1, 2, 3, 4), ]
+
+# The original data defined 3 marital status: married, single, others
+# Clean out others values first
+data <- data[data$X4 %in% c(1, 2, 3), ]
+
+# Calculate the ratio of 1 and 2 of X4 in the original data
+ratio_1 <- sum(data$X4 == 1) / sum(data$X4 %in% c(1, 2))
+ratio_2 <- 1 - ratio_1  # Since it's a binary choice, ratio_2 is the complement of ratio_1
+
+# Change the marital status to the binary variable
+# For each 3 in data$X4, assign 1 or 2 based on the calculated ratio
+set.seed(1007935415)  # Set seed for reproducibility
+data$X4 <- sapply(data$X4, function(x) {
+  if (x == 3) {
+    sample(c(1, 2), 1, prob = c(ratio_1, ratio_2))
+  } else {
+    x
+  }
+})
+
+# Now data$X4 has "others" replaced with 1 or 2 based on the original ratio of 1 and 2
+
+write_csv(data, "cleaned data.csv")
+
+default <- data$Y
+
+# Categorical Predictors
+sex <- data$X2 # 1 = male & 2 = female
+edu_level <- data$X3 # 4 education levels for the clients
+marriage <- data$X4 # If the client married or not
+status_sep <- data$X6 # Status of repayment
+
+# Numerical Predictors
+bal_lim <- data$X1 # Balance limit amount of the client
+age <- data$X5 # Age of the client
+bill_sep <- data$X12 # Amount of bill statement in September
+paid_sep <- data$X18 # Amount paid of the bill in September
+```
+
+\newpage
+## EDA tables and plots
+```{r}
+
+# Assuming 'data' is your dataframe and 'bal_lim' is the numerical variable
+
+# Compute the summary statistics
+bal_lim_stats <- summary(bal_lim)
+
+# Convert the stats to a data frame for nice formatting
+bal_lim_df <- data.frame(
+  Statistic = c("Min", "1st Qu.", "Median", "Mean", "3rd Qu.", "Max"),
+  Value = as.numeric(bal_lim_stats)
+)
+
+# Create a nicely formatted table
+kable(bal_lim_df, caption = "Summary Statistics for Balance Limit", 
+      col.names = c("Statistic", "Value"), digits = 2) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F, position = "center") %>%
+  column_spec(1, bold = T, border_right = T) %>%
+  column_spec(2, width = "2cm")
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+# Count Plot of Marriage Status
+p2 <- ggplot(data, aes(x = factor(marriage))) + 
+  geom_bar(fill = "cornflowerblue") +
+  labs(title = "Marriage Status Counts", 
+       x = "Marriage Status", y = "Count", 
+       caption = "Count of Marriage Status") +
+  theme(plot.caption = element_text(hjust = 0.5)) +
+  scale_x_discrete(labels = c("1" = "Married", "2" = "Single", "3" = "Others"))
+#p2
+
+# Count Plot of Count of Repayment Status in September, 2005
+p3 <- ggplot(data, aes(x = factor(status_sep))) + 
+  geom_bar(fill = "deepskyblue") +
+  labs(title = "Count of Repayment Status in Sep", 
+       x = "Repayment Status", y = "Count", 
+       caption = "
+       Repayment Status of Client in Sep, 2005") +
+  theme(plot.caption = element_text(hjust = 0.5))
+#p3
+
+# Histogram of Bill Statement in September
+p4 <- ggplot(data, aes(x = bill_sep)) + 
+  geom_histogram(bins = 30, fill = "cyan3", color = "black") +
+  labs(title = "Histogram of Bill Statement in Sep", 
+       x = "Bill Statement", y = "Frequency", 
+       caption = "Histogram of Bill Statement of Client in Sep, 2005") +
+  theme(plot.caption = element_text(hjust = 0.5))
+#p4
+
+# Histogram of Amount Paid in September
+p5 <- ggplot(data, aes(x = paid_sep)) + 
+  geom_histogram(bins = 30, fill = "cyan4", color = "black") +
+  labs(title = "Amount Paid in September", 
+       x = "Amount Paid", y = "Frequency", 
+       caption = "Histogram of Amount Paid of Client in Sep, 2005") +
+  theme(plot.caption = element_text(hjust = 0.5))
+#p5
+
+grid.arrange(p2,p3,p4,p5, ncol = 2)
+```
+
+\newpage
+## Modelling
+
+```{r}
+model1 <- glm(default~bal_lim + age + bill_sep + paid_sep + 
+               sex + edu_level + marriage + status_sep, 
+             family = binomial(link = logit))
+summary(model1)
+cat("BIC =", BIC(model1))
+```
+```{r}
+## Stepwise elimination for model1 based on AIC ##
+sel.var.aic <- step(model1, trace = 0, k = 2, direction = "both") 
+select_var_aic<-attr(terms(sel.var.aic), "term.labels")   
+select_var_aic
+```
+
+```{r}
+## Stepwise elimination for model1 based on AIC ##
+sel.var.bic <- step(model1, trace = 0, k = log(nrow(data)), direction = "both")
+select_var_bic<-attr(terms(sel.var.bic), "term.labels")   
+select_var_bic
+```
+
+
+```{r}
+# Model 2 eliminates edu_level from model 1 since it has the least significant p-value in model 1, and sex since it's a categorical value
+model2 <- glm(default~bal_lim + age + bill_sep + paid_sep + 
+               marriage + status_sep, 
+             family = binomial(link = logit))
+summary(model2)
+cat("BIC =", BIC(model2))
+```
+
+```{r}
+## Stepwise elimination for model2 based on AIC ##
+sel.var.aic <- step(model2, trace = 0, k = 2, direction = "both") 
+select_var_aic<-attr(terms(sel.var.aic), "term.labels")   
+select_var_aic
+```
+
+```{r}
+## Stepwise elimination for model2 based on AIC ##
+sel.var.bic <- step(model2, trace = 0, k = log(nrow(data)), direction = "both")
+select_var_bic<-attr(terms(sel.var.bic), "term.labels")   
+select_var_bic
+```
+
+
+```{r}
+# Model 3 eliminates age & edu_level from model 1 since they have the least significant p-value in model 1
+model3 <- glm(default~bal_lim + bill_sep + paid_sep + 
+               sex + marriage + status_sep, 
+             family = binomial(link = logit))
+summary(model3)
+cat("BIC =", BIC(model3))
+```
+
+
+```{r}
+## Stepwise elimination for model3 based on AIC ##
+sel.var.aic <- step(model3, trace = 0, k = 2, direction = "both") 
+select_var_aic<-attr(terms(sel.var.aic), "term.labels")   
+select_var_aic
+```
+
+```{r}
+## Stepwise elimination for model3 based on AIC ##
+sel.var.bic <- step(model3, trace = 0, k = log(nrow(data)), direction = "both")
+select_var_bic<-attr(terms(sel.var.bic), "term.labels")   
+select_var_bic
+```
+The third model has 6 predictors in total, with AIC of 27893 and BIC of 27951.43. Now we need to compare all three models and select the best mode.
+
+
+### Model Selection
+
+```{r}
+aic_values <- c(AIC(model1), AIC(model2), AIC(model3))
+bic_values <- c(BIC(model1), BIC(model2), BIC(model3))
+
+# Create a data frame
+model_comparison <- data.frame(
+  Model = c("Model 1", "Model 2", "Model 3"),
+  AIC = aic_values,
+  BIC = bic_values
+)
+```
+
+
+```{r}
+gt(model_comparison) %>%
+  tab_header(
+    title = "Model Comparison"
+  ) %>%
+  tab_source_note(
+    source_note = "Table 1: Model Comparison using AIC and BIC"
+  ) %>%
+  cols_label(
+    Model = "Model",
+    AIC = "AIC",
+    BIC = "BIC"
+  ) %>%
+  tab_options(
+    column_labels.font.size = px(12),
+    heading.title.font.size = px(14),
+    source_notes.font.size = px(10)
+  )
+
+```
+We choose model 3 as our final model.
+
+
+
+\newpage
+
+## Model calibration with cross-validation and bootstrap  for model3
+
+```{r, eval=TRUE, echo = T}
+## Fit the model with lrm from rms package ##
+lrm.final <- lrm(model3, data = data, x = TRUE, y = TRUE)
+cross.calib <- calibrate(lrm.final, method="crossvalidation", B=10) # model calibration
+plot(cross.calib, las=1, xlab = "Predicted Probability for model3")
+```
+
+
+## Discrimination with ROC curve
+```{r, eval=TRUE, echo = T}
+library(pROC)
+p <- predict(lrm.final, type = "fitted")
+roc_logit <- roc(response = data$Y, predictor = p)
+## The True Positive Rate ##
+TPR <- roc_logit$sensitivities
+## The False Positive Rate ##
+FPR <- 1 - roc_logit$specificities
+
+plot(FPR, TPR, xlim = c(0,1), ylim = c(0,1), type = 'l', lty = 1, lwd = 2,col = 'red')
+abline(a = 0, b = 1, lty = 2, col = 'blue')
+text(0.7,0.4,label = paste("AUC = ", round(auc(roc_logit),2)))
+
+auc(roc_logit)
+```
+
+
+```{r}
+vif(model3)
+```
+
+
+## Plot the dfbetas and deviance residuals
+
+## Dfbetas
+```{r, eval=TRUE, echo = T}
+## Dfbetas ##
+
+log.mod.final <- glm(default~bal_lim + bill_sep + paid_sep + 
+               sex + marriage + status_sep, 
+             family = binomial(link = logit))
+df.final <- dfbetas(log.mod.final)
+head(df.final)
+
+par(family = 'serif')
+par(mfrow = c(1, 3))
+plot(data$X1, df.final[,1], xlab='Amount of Balance Limit (NT dollar)', 
+     ylab='dfbeta')
+lines(lowess(data$X1, df.final[,1]), lwd=2, col='blue')
+abline(h=0, lty='dotted')
+abline(h=-2/sqrt(nrow(df.final)), lty='dotted')
+abline(h=2/sqrt(nrow(df.final)), lty='dotted')
+
+plot(data$X12, df.final[,2], xlab='Amount of bill statement (NT
+dollar) in September, 2005', 
+     ylab='dfbeta')
+lines(lowess(data$X12, df.final[,1]), lwd=2, col='blue')
+abline(h=0, lty='dotted')
+abline(h=-2/sqrt(nrow(df.final)), lty='dotted')
+abline(h=2/sqrt(nrow(df.final)), lty='dotted')
+
+plot(data$X18, df.final[,2], xlab='Amount paid (NT dollar) in
+September, 2005', 
+     ylab='dfbeta')
+lines(lowess(data$X18, df.final[,1]), lwd=2, col='blue')
+abline(h=0, lty='dotted')
+abline(h=-2/sqrt(nrow(df.final)), lty='dotted')
+abline(h=2/sqrt(nrow(df.final)), lty='dotted')
+```
+
+## Deviance residuals
+```{r, eval=TRUE, echo = T}
+## Plot the deviance residuals ##
+res.dev <- residuals(log.mod.final, type = "deviance")
+par(family = 'serif')
+par(mfrow = c(1, 3))
+
+plot(data$X1, res.dev, xlab='Amount of Balance Limit (NT dollar)', 
+     ylab='Deviance Residuals')
+lines(lowess(data$X1, res.dev), lwd=2, col='blue')
+abline(h=0, lty='dotted')
+
+plot(data$X12, res.dev, xlab='Amount of bill statement (NT dollar) in
+September, 2005', 
+     ylab='Deviance Residuals')
+lines(lowess(data$X12, res.dev), lwd=2, col='blue')
+abline(h=0, lty='dotted')
+
+plot(data$X18, res.dev, xlab='Amount paid (NT dollar) in
+September, 2005', 
+     ylab='Deviance Residuals')
+lines(lowess(data$X18, res.dev), lwd=2, col='blue')
+abline(h=0, lty='dotted')
+```
