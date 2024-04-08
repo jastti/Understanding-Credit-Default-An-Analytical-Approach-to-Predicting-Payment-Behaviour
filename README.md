@@ -7,10 +7,9 @@ In Canada, where credit delinquencies have increased, it is crucial to comprehen
 *project.rmd* is the R code of this project, which includes methods, data cleansing, data visualization, model selection and model validation.<br><br>
 *default of credit card clients.csv* is the original data downloaded from the UC Irvine Machine Learning Repository.<br><br>
 *cleaned data.csv* is the data after cleaning and processing.
-
 <br>
 <br>
-#### My Research Question: 
+### My Research Question: 
 How do selected demographic and financial factors, such as a cardholder's background and past payment behaviour, influence the likelihood of credit card payment default?
 <br>
 <br>
