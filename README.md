@@ -1,0 +1,2 @@
+# Understanding-Credit-Default-An-Analytical-Approach-to-Predicting-Payment-Behaviour
+In Canada, where credit delinquencies have increased, it is crucial to comprehend the factors that contribute to credit card defaults. This study examines the relationship between financial behavior and demographic characteristics builds on the logistic regression approach using R, forecasts default risk in this dynamic financial environment.
