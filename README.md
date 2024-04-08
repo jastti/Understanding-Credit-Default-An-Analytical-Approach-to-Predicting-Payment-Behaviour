@@ -5,7 +5,7 @@ In Canada, where credit delinquencies have increased, it is crucial to comprehen
 #### Files:
 *Final Project.pdf* is the written report of this project.<br><br>
 *project.rmd* is the R code of this project, which includes methods, data cleansing, data visualization, model selection and model validation.<br><br>
-*default of credit card clients.csv* is the original data downloaded from the UC Irvine Machine Learning Repository.
+*default of credit card clients.csv* is the original data downloaded from the UC Irvine Machine Learning Repository.<br><br>
 *cleaned data.csv* is the data after cleaning and processing.
 
 <br>
